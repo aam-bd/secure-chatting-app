@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare, User } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import AuthImagePattern from "../components/AuthImagePattern";
 import toast from "react-hot-toast";
@@ -14,6 +14,7 @@ const SignUpPage = () => {
     password: "",
   });
 
+  const navigate = useNavigate();
   const { signup, isSigningUp } = useAuthStore();
 
   const validateForm = () => {
@@ -21,17 +22,22 @@ const SignUpPage = () => {
     if (!formData.email.trim()) return toast.error("Email is required");
     if (!/\S+@\S+\.\S+/.test(formData.email)) return toast.error("Invalid email format");
     if (!formData.password) return toast.error("Password is required");
-    if (formData.password.length < 6) return toast.error("Password must be at least 6 characters");
+    if (formData.password.length < 8) return toast.error("Password must be at least 8 characters");
 
     return true;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     const success = validateForm();
 
-    if (success === true) signup(formData);
+    if (success !== true) return;
+
+    const result = await signup(formData);
+    if (result?.email) {
+      navigate("/verify-signup", { state: { email: result.email } });
+    }
   };
 
   return (
