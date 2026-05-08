@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
+import { decryptUserFields } from "../controllers/auth.controller.js";
 
 export const protectRoute = async (req, res, next) => {
   try {
@@ -21,7 +22,7 @@ export const protectRoute = async (req, res, next) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    req.user = user;
+    req.user = decryptUserFields(user);
 
     next();
   } catch (error) {

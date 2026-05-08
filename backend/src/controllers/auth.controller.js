@@ -3,6 +3,7 @@ import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
 import cloudinary from "../lib/cloudinary.js";
 import { resend } from "../lib/resendClient.js";
+import { rsa, stringToBigInt, bigIntToString } from "../lib/rsa.js";
 
 
 const OTP_TTL_MS = 10 * 60 * 1000;
@@ -14,7 +15,7 @@ const sendOtpEmail = async (email, otp, type) => {
   const html = `<p>Your chat app OTP is <strong>${otp}</strong>.</p><p>This code expires in 10 minutes.</p>`;
 
   const { error } = await resend.emails.send({
-    from: "Chat App <onboarding@resend.dev>",
+    from: "Chat App <admin@oryzaan.com>",
     to: [email],
     subject,
     html,
@@ -33,6 +34,30 @@ const createAndSaveOtp = async (user) => {
   return otp;
 };
 
+const encryptString = (str) => {
+  const bigInt = stringToBigInt(str);
+  const encrypted = rsa.encrypt(bigInt);
+  return encrypted.toString();
+};
+
+const decryptString = (encryptedStr) => {
+  const bigInt = BigInt(encryptedStr);
+  const decrypted = rsa.decrypt(bigInt);
+  return bigIntToString(decrypted);
+};
+
+const decryptUserFields = (user) => {
+  return {
+    _id: user._id,
+    fullName: decryptString(user.encryptedFullName),
+    email: decryptString(user.encryptedEmail),
+    profilePic: user.profilePic,
+    createdAt: user.createdAt,
+  };
+};
+
+export { decryptUserFields };
+
 export const signup = async (req, res) => {
   const { fullName, email, password } = req.body;
   try {
@@ -44,15 +69,16 @@ export const signup = async (req, res) => {
       return res.status(400).json({ message: "Password must be at least 8 characters" });
     }
 
-    const existingUser = await User.findOne({ email });
+    const encryptedEmail = encryptString(email);
+    const existingUser = await User.findOne({ encryptedEmail });
     if (existingUser) return res.status(400).json({ message: "Email already exists" });
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const newUser = new User({
-      fullName,
-      email,
+      encryptedFullName: encryptString(fullName),
+      encryptedEmail,
       password: hashedPassword,
       isVerified: false,
     });
@@ -71,7 +97,8 @@ export const signup = async (req, res) => {
 export const verifySignup = async (req, res) => {
   const { email, otp } = req.body;
   try {
-    const user = await User.findOne({ email });
+    const encryptedEmail = encryptString(email);
+    const user = await User.findOne({ encryptedEmail });
     if (!user) {
       return res.status(400).json({ message: "Invalid email or OTP" });
     }
@@ -90,12 +117,7 @@ export const verifySignup = async (req, res) => {
     await user.save();
 
     generateToken(user._id, res);
-    res.status(200).json({
-      _id: user._id,
-      fullName: user.fullName,
-      email: user.email,
-      profilePic: user.profilePic,
-    });
+    res.status(200).json(decryptUserFields(user));
   } catch (error) {
     console.log("Error in verifySignup controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
@@ -105,7 +127,8 @@ export const verifySignup = async (req, res) => {
 export const login = async (req, res) => {
   const { email, password } = req.body;
   try {
-    const user = await User.findOne({ email });
+    const encryptedEmail = encryptString(email);
+    const user = await User.findOne({ encryptedEmail });
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
@@ -132,7 +155,8 @@ export const login = async (req, res) => {
 export const verifyLogin = async (req, res) => {
   const { email, otp } = req.body;
   try {
-    const user = await User.findOne({ email });
+    const encryptedEmail = encryptString(email);
+    const user = await User.findOne({ encryptedEmail });
     if (!user || !user.isVerified) {
       return res.status(400).json({ message: "Invalid email or OTP" });
     }
@@ -146,12 +170,7 @@ export const verifyLogin = async (req, res) => {
     await user.save();
 
     generateToken(user._id, res);
-    res.status(200).json({
-      _id: user._id,
-      fullName: user.fullName,
-      email: user.email,
-      profilePic: user.profilePic,
-    });
+    res.status(200).json(decryptUserFields(user));
   } catch (error) {
     console.log("Error in verifyLogin controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });
@@ -161,7 +180,8 @@ export const verifyLogin = async (req, res) => {
 export const resendOtp = async (req, res) => {
   const { email } = req.body;
   try {
-    const user = await User.findOne({ email });
+    const encryptedEmail = encryptString(email);
+    const user = await User.findOne({ encryptedEmail });
     if (!user) {
       return res.status(400).json({ message: "Invalid email" });
     }
@@ -201,7 +221,7 @@ export const updateProfile = async (req, res) => {
       { new: true }
     );
 
-    res.status(200).json(updatedUser);
+    res.status(200).json(decryptUserFields(updatedUser));
   } catch (error) {
     console.log("error in update profile:", error.message);
     res.status(500).json({ message: "Internal server error" });
