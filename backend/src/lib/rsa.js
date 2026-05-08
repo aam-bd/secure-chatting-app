@@ -83,8 +83,9 @@ function bigIntToString(bigInt) {
 
 // Note: In reality, p and q must be massive (e.g., 2048-bit) randomly generated primes.
 // This is a toy implementation for demonstration only.
-const p = 61n;
-const q = 53n;
-const rsa = new ToyRSA(p, q, 17n); // Using a small 'e' for this toy example
+// Using larger primes to support longer messages (up to ~256 bytes)
+const p = 94333313318502867046296529386697n;
+const q = 22102528329668129503139506347721n;
+const rsa = new ToyRSA(p, q, 65537n);
 
 export { rsa, stringToBigInt, bigIntToString };

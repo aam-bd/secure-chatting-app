@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import cloudinary from "../lib/cloudinary.js";
 import { resend } from "../lib/resendClient.js";
 import { rsa, stringToBigInt, bigIntToString } from "../lib/rsa.js";
+import { generateKeyPair, pointToString } from "../lib/ecc.js";
 
 
 const OTP_TTL_MS = 10 * 60 * 1000;
@@ -114,6 +115,12 @@ export const verifySignup = async (req, res) => {
     user.isVerified = true;
     user.otp = "";
     user.otpExpires = null;
+
+    // Generate ECC key pair for end-to-end encryption
+    const { privateKey, publicKey } = generateKeyPair();
+    user.eccPrivateKey = privateKey.toString();
+    user.eccPublicKey = pointToString(publicKey);
+
     await user.save();
 
     generateToken(user._id, res);

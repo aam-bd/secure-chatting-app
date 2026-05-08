@@ -32,6 +32,14 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    eccPublicKey: {
+      type: String,
+      default: "",
+    },
+    eccPrivateKey: {
+      type: String,
+      default: "",
+    },
   },
   { timestamps: true }
 );
